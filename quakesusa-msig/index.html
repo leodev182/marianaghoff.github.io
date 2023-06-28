@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="initial-scale=1, maximum-scale=1,user-scalable=no">
+  <title></title>
+
+  <link rel="stylesheet" href="https://js.arcgis.com/3.42/dijit/themes/claro/claro.css">
+  <link rel="stylesheet" href="https://js.arcgis.com/3.42/esri/css/esri.css">
+
+  <link rel="stylesheet" href="css/layout.css" />
+
+  <script>var dojoConfig = { parseOnLoad: true };</script>
+  <script src="https://js.arcgis.com/3.42/"></script>
+
+  <style>
+    #search {
+      display: block;
+      position: absolute;
+      z-index: 2;
+      top: 10px;
+      right: 10px;
+    }
+  </style>
+  <script>
+
+    var map;
+    var tb;
+    require(["esri/map",
+      "dojo/on",
+      "esri/layers/ArcGISDynamicMapServiceLayer",
+      "esri/layers/FeatureLayer",
+      "esri/dijit/Legend",
+      "esri/dijit/Search",
+      "esri/dijit/BasemapGallery",
+      "esri/dijit/Scalebar",
+      "esri/dijit/Popup",
+      "esri/dijit/PopupTemplate",
+      "esri/dijit/OverviewMap",
+
+      "esri/toolbars/draw",
+      "esri/symbols/SimpleFillSymbol",
+      "esri/symbols/SimpleLineSymbol",
+      "esri/graphic",
+      "dojo/parser",
+      "esri/Color",
+      "esri/tasks/query",
+      "esri/symbols/SimpleMarkerSymbol",
+
+      "dijit/TitlePane",
+      "dijit/layout/TabContainer",
+      "dijit/layout/ContentPane",
+      "dijit/layout/BorderContainer",
+      "dojo/domReady!"],
+      function (
+        Map,
+        on, ArcGISDynamicMapServiceLayer, FeatureLayer, Legend, Search, BasemapGallery, Scalebar, Popup, PopupTemplate, OverviewMap, Draw, SimpleFillSymbol, SimpleLineSymbol, Graphic, parser,
+        Color, Query, SimpleMarkerSymbol,
+
+      ) {
+
+
+        on(dojo.byId("pintaYQuery"), "click", fPintaYQuery);
+        on(dojo.byId("progButtonNode"), "click", fQueryEstados);
+
+        // Draw and select
+        function fPintaYQuery() {
+          var citiesLayer = new FeatureLayer("http://sampleserver6.arcgisonline.com/arcgis/rest/services/USA/MapServer/0", {
+            outFields: ["*"]
+          });
+          map.addLayer(citiesLayer);
+
+          var drawTool = new Draw(map);
+          drawTool.on("draw-end", function(event) {
+            var fillSymbol = new SimpleFillSymbol(
+              SimpleFillSymbol.STYLE_SOLID,
+              new SimpleLineSymbol(
+                SimpleLineSymbol.STYLE_SOLID,
+                new dojo.Color([255, 0, 0]),
+                2
+              ),
+              new dojo.Color([255, 255, 0, 0.25])
+            );
+
+          var graphic = new Graphic(event.geometry, fillSymbol);
+          map.graphics.add(graphic);
+
+          var query = new Query();
+          query.geometry = event.geometry;
+          citiesLayer.selectFeatures(query);
+
+          var symbolSelected = new SimpleMarkerSymbol({
+            "type": "esriSMS",
+            "style": "esriSMSCircle",
+            "color": [255, 115, 0, 128],
+            "size": 6,
+            "outline": {
+              "color": [255, 0, 0, 214],
+              "width": 1
+            }
+          });
+
+          citiesLayer.setSelectionSymbol(symbolSelected);
+          });
+
+        drawTool.activate(Draw.POLYGON);
+      
+        };    
+
+
+
+         // CIUDADES 
+        function fQueryEstados() {
+          var estado = document.getElementById("dtb").value;
+          var query = new Query();
+          query.where = "STATE_NAME = '" + estado + "'";
+
+          var statesLayer = new FeatureLayer("http://sampleserver6.arcgisonline.com/arcgis/rest/services/USA/MapServer/2", {
+            outFields: ["*"]
+          });
+
+          statesLayer.id = "statesLayer";
+          map.addLayer(statesLayer);
+
+          
+          statesLayer.queryFeatures(query, function(results) {
+            if (results.features.length > 0) {
+              fDestacarEstado(results.features[0]);
+            } 
+            else {
+              alert("El estado introducido no se encontró en la capa.");
+            }
+          });
+
+                   
+          function fDestacarEstado(estadoSeleccionado) {
+            var statesLayer = map.getLayer("statesLayer");
+            var symbol = new SimpleFillSymbol(SimpleFillSymbol.STYLE_SOLID, new SimpleLineSymbol(SimpleLineSymbol.STYLE_SOLID, new Color([255, 255, 0]), 2), new Color([255, 255, 0, 0.1]));
+  
+            estadoSeleccionado.setSymbol(symbol);
+            map.graphics.add(estadoSeleccionado);
+
+            var extent = estadoSeleccionado.geometry.getExtent();
+            map.setExtent(extent);
+          }
+
+          document.getElementById("progButtonNode").addEventListener("click", validarEstado);
+        
+        };
+        
+
+
+
+
+        map = new Map("map", {
+          basemap: "topo",
+          center: [-93.3507, 40.9886], // long, lat
+          zoom: 5,
+          sliderStyle: "small"
+        });
+
+        map.on("load", function (evt) {
+          map.resize();
+          map.reposition();
+        });
+
+        var scalebar = new Scalebar({
+          map: map,
+          scalebarUnit: "metric",
+          attachTo: "bottom-left"
+        });
+
+        // Overview Map
+        var overviewMapDijit = new OverviewMap({
+          map: map,
+          visible: true
+        });
+        overviewMapDijit.startup();
+
+        var lyrUSA = new ArcGISDynamicMapServiceLayer("http://sampleserver6.arcgisonline.com/arcgis/rest/services/USA/MapServer", {
+          opacity: 0.5
+        });
+
+        map.addLayers([lyrUSA]);
+
+
+        //Popup
+        var template = new PopupTemplate({
+          title: "{STATE_NAME}",
+          description: "Población: {POP2000}, Población por SQMI: {POP00_SQMI}, Área en SQMI: {st_area(shape)}", 
+          fieldInfos: [{ //define field infos so we can specify an alias
+            fieldName: "STATE_NAME",
+            label: "Condado"
+          },{
+            fieldName: "POP2000",
+            label: "Población"
+          },{
+            fieldName: "POP00_SQMI",
+            label: "Población por SQMI"
+          },{
+            fieldName: "área",
+            label: "Área en SQMI"
+          }]
+        });
+
+        var featureLayer = new FeatureLayer("http://sampleserver6.arcgisonline.com/arcgis/rest/services/USA/MapServer/2",{
+          mode: FeatureLayer.MODE_ONDEMAND,
+          outFields: ["*"],
+          infoTemplate: template
+        });
+        map.addLayer(featureLayer);
+
+        
+        // Add the legend to the map
+        map.on("layers-add-result", function () {
+          var dijitLegend = new Legend({
+              map: map,
+              arrangement: Legend.ALIGN_LEFT
+          }, "legendDiv");
+          dijitLegend.startup();
+        });
+
+        // Search Widget
+        var Search = new Search({
+          map : map,
+          autoComplete : true
+        }, "divSearch");
+        Search.startup();
+
+        // BaseMapGallery
+        var basemapGallery = new BasemapGallery({
+            showArcGISBasemaps : true,
+            map : map
+        }, "basemapGallery");
+        basemapGallery.startup();      
+        
+      });
+    
+
+
+
+  </script>
+
+</head>
+
+<body class="claro">
+  <div id="mainWindow" data-dojo-type="dijit.layout.BorderContainer" data-dojo-props="design:'headline', gutters:false"
+    style="width:100%; height:100%;">
+
+    <div id="header" data-dojo-type="dijit.layout.ContentPane" data-dojo-props="region:'top'">
+
+      Master GIS ESRI España
+      <div id="subheader">Mariana García Hoffmann</div>
+
+    </div>
+    <div data-dojo-type="dijit.layout.ContentPane" id="leftPane" data-dojo-props="region:'left'">
+      <div data-dojo-type="dijit.layout.TabContainer">
+
+        <div data-dojo-type="dijit.layout.ContentPane" data-dojo-props="title:'Leyenda', selected:true">
+          <div id="legendDiv"></div>
+        </div>
+
+        <div data-dojo-type="dijit.layout.ContentPane" data-dojo-props="title:'Tareas'">
+          Operaciones
+          <button id="pintaYQuery" type="button">Seleccionar ciudades</button>
+        </div>
+
+      </div>
+    </div>
+
+    <div id="map" data-dojo-type="dijit.layout.ContentPane" data-dojo-props="region:'center'">
+      <!--Div Search-->
+      <div id="divSearch"></div>
+      <!-- Galería de mapas base -->
+      <div data-dojo-type="dijit/TitlePane" data-dojo-props="title:'Switch Basemap', closable:false, open:false">
+        <div data-dojo-type="dijit/layout/ContentPane" style="width:380px; height:280px; overflow:auto;">
+          <div id="basemapGallery"></div>
+        </div>
+      
+      </div>
+    
+      
+    </div>
+<!-- Escribe una función en PHP que permita ingresar el nombre del campo "STATE_NAME de esta capa: http://sampleserver6.arcgisonline.com/arcgis/rest/services/USA/MapServer/2 y que después, el estado de la capa se coloree de amarillo y se centre la extensión del mapa en el estado. " -->
+    <div id="footer" data-dojo-type="dijit.layout.ContentPane" data-dojo-props="region:'bottom'">
+
+      <label for="dtb">Introduzca el nombre de un estado:</label> <input id="dtb" data-dojo-type="dijit/form/TextBox"
+        value="Washington" />
+      <button id="progButtonNode" type="button">Ir al estado</button>
+    </div>
+
+  </div>
+</body>
+
+</html>
