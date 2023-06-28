@@ -23,3 +23,7 @@ header img {
 .progress {
     margin: 4px;
 }   
+
+.container1, .container2 {
+    gap: 2.3em;
+}
