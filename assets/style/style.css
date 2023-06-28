@@ -27,3 +27,11 @@ header img {
 .container1, .container2 {
     gap: 2.3em;
 }
+
+footer {
+    background-color: rgb(51, 55, 58);
+    height: 53px;
+    color: white;
+    padding: 20px 0px 0px 0px;
+    font-size: 15px;
+}
